@@ -6,7 +6,9 @@ import numpy as np
 '''
 Yapılacaklar 
 
-bulunan adayların kuş baışı resmini çıkart
+köşe dizmeyi düzelt
+artag oluştur
+
 adayları onayla
 çoklu ve tekli tespit etme modlarını uyarla 
 bulunanların merkes kordinatını hesapla
@@ -24,11 +26,10 @@ class params:
     minAreaRate = 0.03
     maxAreaRate = 4
     minCornerDisRate = 2.5
-    minMarkerDisRate = 0.5
+    minMarkerDisRate = 0.9
 
 
 def sort_corners(corners):
-    # köşeleri sırala
     dx1 = corners[1][0] - corners[0][0]
     dy1 = corners[1][1] - corners[0][1]
     dx2 = corners[2][0] - corners[0][0]
@@ -39,19 +40,21 @@ def sort_corners(corners):
     if crossproduct < 0:
         corners[1], corners[3] = corners[3], corners[1]
 
+    # deneme amaçlıdırlar (m y k)
+    global frame
+    cv2.circle(frame, tuple(corners[0]), 1, (255, 0, 0), 3)  # mavi
+    cv2.circle(frame, tuple(corners[1]), 1, (255, 255, 0), 3) # sarı
+    cv2.circle(frame, tuple(corners[2]), 1, (255, 0, 255), 3) # mor
+    cv2.circle(frame, tuple(corners[3]), 1, (0, 255, 255), 5) # turkuaz
+
 
 def get_corners(candidate):
-    corners = list()
-    for i in range(4):
-        corners.append(tuple(candidate[i][0]))
-
     corners = np.array([
         [candidate[0][0][0], candidate[0][0][1]],
         [candidate[1][0][0], candidate[1][0][1]],
         [candidate[2][0][0], candidate[2][0][1]],
         [candidate[3][0][0], candidate[3][0][1]],
     ], dtype="float32")
-
     return corners
 
 
@@ -66,7 +69,7 @@ def remove_close_candidates(candidates):
 
             minPerimeter = min(cv2.arcLength(candidates[i], True), cv2.arcLength(candidates[j], True))
 
-            #fc ilk köşe
+            # fc ilk köşe
             for fc in range(4):
                 disSq = 0
                 for c in range(4):
@@ -77,7 +80,6 @@ def remove_close_candidates(candidates):
                 disSq /= 4
 
                 minDisPixels = minPerimeter * params.minMarkerDisRate
-                print(minDisPixels * minDisPixels)
 
                 if disSq < minDisPixels * minDisPixels:
                     if cv2.contourArea(candidates[i]) > cv2.contourArea(candidates[j]):
@@ -91,11 +93,6 @@ def remove_close_candidates(candidates):
         return newCandidates
     else:
         return candidates
-
-
-# remove_close_candidate fonksiyonuna alternatif
-def is_child(contour, hierarchy):
-    pass
 
 
 def has_close_corners(candidate):
@@ -115,15 +112,9 @@ def has_close_corners(candidate):
 
 
 # satır 601  510  eb411
-def validate_candidate(candidate, frame):
+def get_candate_img(candidate, frame):
     corners = get_corners(candidate)
     sort_corners(corners)
-
-    #deneme amaçlıdırlar
-   #cv2.circle(frame, tuple(corners[0]), 5, (255, 0, 0), 3)  # (m y k)
-   #cv2.circle(frame, tuple(corners[1]), 5, (255, 255, 0), 3)
-   #cv2.circle(frame, tuple(corners[2]), 5, (255, 0, 255), 3)
-   #cv2.circle(frame, tuple(corners[3]), 5, (255, 255, 255), 3)
 
     (tl, tr, br, bl) = corners
     widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
@@ -143,6 +134,8 @@ def validate_candidate(candidate, frame):
 
     M = cv2.getPerspectiveTransform(corners, dst)
     warped = cv2.warpPerspective(frame, M, (maxWidth, maxHeight), borderMode=cv2.INTER_NEAREST)
+    #warped = cv2.threshold(warped, 255, cv2.THRESH_OTSU+cv2.THRESH_BINARY, 11, params.threshConsant)
+    # gösterim amaçlı
     cv2.imshow("artag", warped)
 
 
@@ -184,10 +177,9 @@ while True:
 
     # çok yakın adaylar varsa küçük olan elenir
 
-
     if len(candidates) > 0:
-        validate_candidate(candidates[0], frame)
         candidates = remove_close_candidates(candidates)
+        get_candate_img(candidates[0], frame)
 
     cv2.drawContours(frame, candidates, -1, (0, 255, 0), 1)
     #cv2.drawContours(frame, cnts, -1, (255, 0, 0), 1)
