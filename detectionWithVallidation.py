@@ -25,8 +25,8 @@ class params:
     maxAreaRate = 4
     minCornerDisRate = 2.5
     minMarkerDisRate = 1.5
-    bitCellFillRate = 0.55
-    monoDetection = True
+    bitCellFillRate = 0.5
+    monoDetection = False
 
 
 def remove_close_candidates(candidates):
@@ -114,7 +114,7 @@ def get_corners(candidate):
 
 def get_candate_img(candidate, frame):
     corners = get_corners(candidate)
-    #sort_corners(corners)
+    sort_corners(corners)
 
     (tl, tr, br, bl) = corners
     widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
@@ -142,6 +142,7 @@ def get_candate_img(candidate, frame):
 def validate_candidate(candidate, frame):
     candidate_img = get_candate_img(candidate, frame)
     ret, candidate_img = cv2.threshold(candidate_img, 125, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+
     bits = extract_bits(candidate_img)
     recreate_img(bits)
 
@@ -179,21 +180,15 @@ def extract_bits(img):
 
     cellWidth = int(img.shape[1] / markerSizeWithBorders)
     cellHeight = int(img.shape[0] / markerSizeWithBorders)
-    totalPixelsEachBit = cellHeight * cellWidth
 
     # her bit için
-    for i in range(markerSizeWithBorders):
-        for j in range(markerSizeWithBorders):
-            # doluluk oranını hesapla
-            filledPixel = 0
-            for x in range(cellWidth):
-                ix = cellWidth * i + x
-                for y in range(cellHeight):
-                    iy = cellHeight * j + y
-                    if img[iy][ix] == 255:
-                        filledPixel += 1
+    for j in range(borderSize, markerSizeWithBorders-borderSize):
+        Ystart = j * cellHeight
+        for i in range(borderSize, markerSizeWithBorders-borderSize):
+            Xstart = i * cellWidth
 
-            if filledPixel / totalPixelsEachBit > params.bitCellFillRate:
+            bitImg = img[Ystart:Ystart+cellHeight, Xstart:Xstart+cellWidth]
+            if np.count_nonzero(bitImg) / bitImg.size > 0.6:
                 bitmap[j][i] = 1
 
     return bitmap
@@ -202,7 +197,7 @@ def extract_bits(img):
 def detect_candidates(grayImg):
     th = cv2.adaptiveThreshold(grayImg, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 11, params.threshConsant)
     cnts = cv2.findContours(th, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)[-2]
-
+    cv2.imshow('th', th)
     # ayıklama
     candidates = list()
     for c in cnts:
@@ -236,7 +231,7 @@ def find_center(marker):
 camera = cv2.VideoCapture(0)
 while True:
     _, frame = camera.read()
-    frame = cv2.GaussianBlur(frame, (5,5), 0)
+    #frame = cv2.GaussianBlur(frame, (7,7), 0)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     candidates = detect_candidates(gray)
@@ -256,7 +251,6 @@ while True:
 
         center = find_center(candidates[0])
         cv2.circle(frame, center, 5, (0, 0, 255), -1)
-        print(len(candidates))
 
     cv2.imshow('frame', frame)
     if cv2.waitKey(10) == 27:  # esc ile çıkar
