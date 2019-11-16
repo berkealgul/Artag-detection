@@ -15,6 +15,18 @@ sonuçları ros üzerinden yayınla
 '''
 
 
+class tags:
+    sample = np.array([
+        [1,1,1,0,0,0,1],
+        [1,1,0,1,0,0,0],
+        [1,0,0,1,0,0,0],
+        [1,0,1,0,1,0,1],
+        [0,0,0,0,1,1,1],
+        [1,1,1,0,1,1,1],
+        [1,1,1,1,1,1,1]
+    ],dtype=int)
+
+
 class params:
     threshConsant = 7
     threshWinSizeMax = 23
@@ -24,9 +36,9 @@ class params:
     minAreaRate = 0.03
     maxAreaRate = 4
     minCornerDisRate = 2.5
-    minMarkerDisRate = 1.5
-    bitCellFillRate = 0.5
-    monoDetection = False
+    minMarkerDisRate = 1
+    resizeRate = 3
+    monoDetection = True
 
 
 def remove_close_candidates(candidates):
@@ -82,7 +94,7 @@ def has_close_corners(candidate):
         return False
 
 
-# HATALI ÇALIŞIYOR (gereksiz de olabilir)
+# HATALI ÇALIŞIYOR
 def sort_corners(corners):
    dx1 = corners[1][0] - corners[0][0]
    dy1 = corners[1][1] - corners[0][1]
@@ -107,14 +119,14 @@ def get_corners(candidate):
         [candidate[0][0][0], candidate[0][0][1]],
         [candidate[1][0][0], candidate[1][0][1]],
         [candidate[2][0][0], candidate[2][0][1]],
-        [candidate[3][0][0], candidate[3][0][1]],
+        [candidate[3][0][0], candidate[3][0][1]]
     ], dtype="float32")
     return corners
 
 
 def get_candate_img(candidate, frame):
     corners = get_corners(candidate)
-    sort_corners(corners)
+    #sort_corners(corners)
 
     (tl, tr, br, bl) = corners
     widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
@@ -139,15 +151,28 @@ def get_candate_img(candidate, frame):
     return warped
 
 
-def validate_candidate(candidate, frame):
-    candidate_img = get_candate_img(candidate, frame)
-    ret, candidate_img = cv2.threshold(candidate_img, 125, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+def validate_candidates(candidates, frame):
+    markers = list()
+    for can in candidates:
+        candidate_img = get_candate_img(can, frame)
+        ret, candidate_img = cv2.threshold(candidate_img, 125, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
-    bits = extract_bits(candidate_img)
-    recreate_img(bits)
+        bits = extract_bits(candidate_img)
+        validMarker = tags.sample.copy()
 
-    # gösterim amaçlı
-    cv2.imshow("otsu", candidate_img)
+        for i in range(4):
+            validimg = recreate_img(validMarker)
+            cv2.imshow("valid", validimg)
+            if np.array_equal(bits, validMarker):
+                markers.append(can)
+                break
+            validMarker = np.rot90(validMarker)
+
+        bitimg = recreate_img(bits)
+        cv2.imshow("bits", bitimg)
+        # gösterim amaçlı
+        #cv2.imshow("otsu", candidate_img)
+    return markers
 
 
 # extract_bits fonksiyonu çalışmasını kontrol etmek için oluşturuldu
@@ -165,7 +190,14 @@ def recreate_img(bits):
                     iy = j * cellSize + y
                     img[iy, ix] = 255
 
-    cv2.imshow("newTag", img)
+    return img
+
+
+def resize_img(inputImg):
+    w = int(inputImg.shape[1]*params.resizeRate)
+    h = int(inputImg.shape[0]*params.resizeRate)
+    outputImg = cv2.resize(inputImg, (w,h))
+    return outputImg
 
 
 def extract_bits(img):
@@ -175,29 +207,33 @@ def extract_bits(img):
     borderSize = 2
 
     markerSizeWithBorders = markerSize + 2 * borderSize
-
-    bitmap = np.zeros((markerSizeWithBorders, markerSizeWithBorders))
-
+    bitmap = np.zeros((markerSize, markerSize), dtype=int)
     cellWidth = int(img.shape[1] / markerSizeWithBorders)
     cellHeight = int(img.shape[0] / markerSizeWithBorders)
 
-    # her bit için
-    for j in range(borderSize, markerSizeWithBorders-borderSize):
-        Ystart = j * cellHeight
-        for i in range(borderSize, markerSizeWithBorders-borderSize):
-            Xstart = i * cellWidth
+    inner_rg = img[borderSize*cellHeight:(markerSizeWithBorders-borderSize)*cellHeight,
+               borderSize*cellWidth:(markerSizeWithBorders-borderSize)*cellWidth]
 
-            bitImg = img[Ystart:Ystart+cellHeight, Xstart:Xstart+cellWidth]
-            if np.count_nonzero(bitImg) / bitImg.size > 0.6:
+    cv2.imshow('adad', inner_rg)
+    # her bit için
+    for j in range(markerSize):
+        Ystart = j * cellHeight
+        for i in range(markerSize):
+            Xstart = i * cellWidth
+            bitImg = inner_rg[Ystart:Ystart+cellHeight, Xstart:Xstart+cellWidth]
+
+            if np.count_nonzero(bitImg) / bitImg.size > 0.5:
                 bitmap[j][i] = 1
 
     return bitmap
 
 
 def detect_candidates(grayImg):
-    th = cv2.adaptiveThreshold(grayImg, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 11, params.threshConsant)
+    th = cv2.adaptiveThreshold(grayImg, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 9, params.threshConsant)
     cnts = cv2.findContours(th, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)[-2]
+
     cv2.imshow('th', th)
+
     # ayıklama
     candidates = list()
     for c in cnts:
@@ -229,28 +265,29 @@ def find_center(marker):
 
 # ANA ALGORİTMA BAŞLANGICI
 camera = cv2.VideoCapture(0)
+camera.set(3, 1280)
+camera.set(4, 720)
 while True:
     _, frame = camera.read()
-    #frame = cv2.GaussianBlur(frame, (7,7), 0)
+    frame = cv2.GaussianBlur(frame, (3,3), 0)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     candidates = detect_candidates(gray)
 
     if len(candidates) > 0:
         candidates = remove_close_candidates(candidates)
-        validate_candidate(candidates[0], gray)
 
-        if params.monoDetection is True and len(candidates) > 1:
-            biggest = max(candidates, key=cv2.contourArea)
-            candidates.clear()
-            candidates.append(biggest)
-            center = find_center(biggest)
-            cv2.circle(frame, center, 5, (0,0,255), -1)
+        #if params.monoDetection is True and len(candidates) > 1:
+            #biggest = max(candidates, key=cv2.contourArea)
+            #candidates[0] = biggest
 
+        markers = validate_candidates(candidates, gray)
+        #center = find_center(candidates[0])
+        #cv2.circle(frame, center, 5, (0, 0, 255), -1)
         cv2.drawContours(frame, candidates, -1, (0, 255, 0), 1)
 
-        center = find_center(candidates[0])
-        cv2.circle(frame, center, 5, (0, 0, 255), -1)
+        if len(markers) > 0:
+            cv2.drawContours(frame, markers, -1, (255, 0, 0), 3)
 
     cv2.imshow('frame', frame)
     if cv2.waitKey(10) == 27:  # esc ile çıkar
