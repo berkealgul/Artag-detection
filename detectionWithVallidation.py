@@ -17,14 +17,80 @@ sonuçları ros üzerinden yayınla
 
 class tags:
     sample = np.array([
-        [1,1,1,0,0,0,1],
-        [1,1,0,1,0,0,0],
-        [1,0,0,1,0,0,0],
-        [1,0,1,0,1,0,1],
-        [0,0,0,0,1,1,1],
-        [1,1,1,0,1,1,1],
-        [1,1,1,1,1,1,1]
+        [1, 1, 1, 0, 0, 0, 1],
+        [1, 1, 0, 1, 0, 0, 0],
+        [1, 0, 0, 1, 0, 0, 0],
+        [1, 0, 1, 0, 1, 0, 1],
+        [0, 0, 0, 0, 1, 1, 1],
+        [1, 1, 1, 0, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1]
     ],dtype=int)
+
+    valids = [
+        np.array([
+            [1, 1, 0, 1, 1],
+            [1, 1, 0, 1, 1],
+            [1, 0, 1, 0, 1],
+            [1, 0, 1, 1, 0],
+            [1, 0, 1, 1, 0],
+        ], dtype=int),
+        np.array([
+            [1, 1, 0, 1, 1],
+            [1, 1, 0, 1, 1],
+            [1, 0, 1, 0, 1],
+            [1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1],
+        ], dtype=int),
+        np.array([
+            [1, 1, 0, 1, 1],
+            [1, 1, 0, 1, 1],
+            [1, 0, 1, 0, 1],
+            [0, 0, 1, 1, 0],
+            [1, 1, 1, 0, 1],
+        ], dtype=int),
+        np.array([
+            [1, 1, 0, 1, 1],
+            [1, 1, 0, 1, 1],
+            [1, 0, 1, 0, 1],
+            [0, 1, 1, 1, 1],
+            [1, 0, 1, 0, 0],
+        ], dtype=int),
+        np.array([
+            [1, 1, 0, 1, 1],
+            [1, 1, 0, 1, 1],
+            [1, 0, 1, 0, 1],
+            [1, 0, 1, 1, 1],
+            [0, 1, 1, 0, 0],
+        ], dtype=int),
+        np.array([
+            [1, 1, 0, 1, 1],
+            [1, 1, 0, 1, 1],
+            [1, 0, 1, 0, 1],
+            [0, 1, 1, 1, 0],
+            [0, 1, 1, 1, 0],
+        ], dtype=int),
+        np.array([
+            [1, 1, 0, 1, 1],
+            [1, 1, 0, 1, 1],
+            [1, 0, 1, 0, 1],
+            [0, 0, 1, 1, 1],
+            [0, 0, 1, 1, 1],
+        ], dtype=int),
+        np.array([
+            [1, 1, 0, 1, 1],
+            [1, 1, 0, 1, 1],
+            [1, 0, 1, 0, 1],
+            [1, 1, 1, 1, 0],
+            [0, 0, 1, 0, 1],
+        ], dtype=int),
+        np.array([
+            [1, 1, 0, 1, 1],
+            [1, 1, 0, 1, 1],
+            [1, 0, 1, 0, 1],
+            [0, 0, 1, 0, 1],
+            [1, 1, 1, 1, 0],
+        ], dtype=int),
+    ]
 
 
 class params:
@@ -37,10 +103,12 @@ class params:
     maxAreaRate = 4
     minCornerDisRate = 2.5
     minMarkerDisRate = 1
-    resizeRate = 3
+    resizeRate = 4
+    cellMarginRate = 0.13
     monoDetection = True
 
 
+#çok ağır çalışıyor + tam çalışmıyor (bu fonksiyondan vazgeçilebilir)
 def remove_close_candidates(candidates):
     newCandidates = list()
 
@@ -94,7 +162,6 @@ def has_close_corners(candidate):
         return False
 
 
-# HATALI ÇALIŞIYOR
 def sort_corners(corners):
    dx1 = corners[1][0] - corners[0][0]
    dy1 = corners[1][1] - corners[0][1]
@@ -107,11 +174,11 @@ def sort_corners(corners):
        corners[1], corners[3] = corners[3], corners[1]
 
     # deneme amaçlıdırlar (m y k
-   global frame
-   cv2.circle(frame, tuple(corners[0]), 2, (255, 0, 0), 3)    # mavi
-   cv2.circle(frame, tuple(corners[1]), 2, (255, 255, 0), 3)  # sarı
-   cv2.circle(frame, tuple(corners[2]), 2, (255, 0, 255), 3)  # mor
-   cv2.circle(frame, tuple(corners[3]), 2, (0, 255, 255), 5)  # turkuaz
+  # global frame
+  # cv2.circle(frame, tuple(corners[0]), 2, (255, 0, 0), 3)    # mavi
+  # cv2.circle(frame, tuple(corners[1]), 2, (255, 255, 0), 3)  # sarı
+  # cv2.circle(frame, tuple(corners[2]), 2, (255, 0, 255), 3)  # mor
+  # cv2.circle(frame, tuple(corners[3]), 2, (0, 255, 255), 5)  # turkuaz
 
 
 def get_corners(candidate):
@@ -126,7 +193,7 @@ def get_corners(candidate):
 
 def get_candate_img(candidate, frame):
     corners = get_corners(candidate)
-    #sort_corners(corners)
+    sort_corners(corners)
 
     (tl, tr, br, bl) = corners
     widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
@@ -158,19 +225,18 @@ def validate_candidates(candidates, frame):
         ret, candidate_img = cv2.threshold(candidate_img, 125, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
         bits = extract_bits(candidate_img)
-        validMarker = tags.sample.copy()
+        bits = np.transpose(bits)
 
-        for i in range(4):
-            validimg = recreate_img(validMarker)
-            cv2.imshow("valid", validimg)
-            if np.array_equal(bits, validMarker):
-                markers.append(can)
-                break
-            validMarker = np.rot90(validMarker)
+        for valid in tags.valids:
+            validMarker = valid.copy()
+            for i in range(4):
+                if np.array_equal(bits, validMarker):
+                    markers.append(can)
+                    break
+                validMarker = np.rot90(validMarker)
 
-        bitimg = recreate_img(bits)
-        cv2.imshow("bits", bitimg)
-        # gösterim amaçlı
+        #bitimg = recreate_img(bits)
+        #cv2.imshow("bits", bitimg)
         #cv2.imshow("otsu", candidate_img)
     return markers
 
@@ -201,9 +267,11 @@ def resize_img(inputImg):
 
 
 def extract_bits(img):
+    img = resize_img(img)
+
     # artag boyutları şimdilik fonksiyon içinde tanımlı
     # ileride belli bir parametreye bağlanacak
-    markerSize = 7
+    markerSize = 5
     borderSize = 2
 
     markerSizeWithBorders = markerSize + 2 * borderSize
@@ -214,14 +282,15 @@ def extract_bits(img):
     inner_rg = img[borderSize*cellHeight:(markerSizeWithBorders-borderSize)*cellHeight,
                borderSize*cellWidth:(markerSizeWithBorders-borderSize)*cellWidth]
 
-    cv2.imshow('adad', inner_rg)
+    marginX = int(cellWidth * params.cellMarginRate)
+    marginY = int(cellHeight * params.cellMarginRate)
+
     # her bit için
     for j in range(markerSize):
         Ystart = j * cellHeight
         for i in range(markerSize):
             Xstart = i * cellWidth
-            bitImg = inner_rg[Ystart:Ystart+cellHeight, Xstart:Xstart+cellWidth]
-
+            bitImg = inner_rg[Ystart+marginY:Ystart+cellHeight-marginY, Xstart+marginX:Xstart+cellWidth-marginX]
             if np.count_nonzero(bitImg) / bitImg.size > 0.5:
                 bitmap[j][i] = 1
 
@@ -265,8 +334,6 @@ def find_center(marker):
 
 # ANA ALGORİTMA BAŞLANGICI
 camera = cv2.VideoCapture(0)
-camera.set(3, 1280)
-camera.set(4, 720)
 while True:
     _, frame = camera.read()
     frame = cv2.GaussianBlur(frame, (3,3), 0)
@@ -275,7 +342,7 @@ while True:
     candidates = detect_candidates(gray)
 
     if len(candidates) > 0:
-        candidates = remove_close_candidates(candidates)
+        #candidates = remove_close_candidates(candidates)
 
         #if params.monoDetection is True and len(candidates) > 1:
             #biggest = max(candidates, key=cv2.contourArea)
@@ -284,7 +351,7 @@ while True:
         markers = validate_candidates(candidates, gray)
         #center = find_center(candidates[0])
         #cv2.circle(frame, center, 5, (0, 0, 255), -1)
-        cv2.drawContours(frame, candidates, -1, (0, 255, 0), 1)
+        #cv2.drawContours(frame, candidates, -1, (0, 255, 0), 2)
 
         if len(markers) > 0:
             cv2.drawContours(frame, markers, -1, (255, 0, 0), 3)
